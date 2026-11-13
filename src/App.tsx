@@ -33,6 +33,8 @@ const initialObligations: Obligation[] = [
     date: "25 nov 2026",
     amount: 12.99,
     status: "Próxima",
+    category: "Suscripción",
+    reminderDays: 3,
   },
   {
     id: 2,
