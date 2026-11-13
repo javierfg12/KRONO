@@ -959,3 +959,93 @@
     padding: 12px;
   }
 }
+
+
+/* Ajustes de alineación para reproducir las pantallas de KRONO - App en Figma.
+   El contenedor .screen ya aporta 24px de margen horizontal. */
+.obligations-title {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.obligations-screen .header-divider {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.obligations-subtitle {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.obligation-filters {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.obligations-list {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.detail-heading {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.detail-screen .header-divider {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.detail-subtitle {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.detail-main-card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.detail-data {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.detail-actions {
+  margin-top: 40px;
+  gap: 12px;
+}
+
+.detail-actions .primary-button,
+.detail-actions .outline-button {
+  width: 100%;
+  min-height: 46px;
+  height: 46px;
+  margin: 0;
+}
+
+.detail-postpone-options .outline-button {
+  margin: 0;
+}
+
+.detail-action-message,
+.detail-completed-message {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+@media (max-width: 360px) {
+  .obligation-filters,
+  .obligations-list,
+  .detail-main-card,
+  .detail-data {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
