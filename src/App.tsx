@@ -1,5 +1,13 @@
 
-import { NavLink, BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
+import {
+  NavLink,
+  Navigate,
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import {
   Home,
   ClipboardList,
@@ -11,58 +19,20 @@ import {
 } from "lucide-react";
 import "./App.css";
 import React, { useState } from "react";
-
-type Obligation = {
-  id: number;
-  name: string;
-  description: string;
-  date: string;
-  amount?: number;
-  status: "Próxima" | "En plazo" | "Vencida" | "Completada" | "Cancelada";
-  category?: string;
-  reminderDays?: number;
-  reminderSnoozedUntil?: string;
-  cancelledAt?: string;
-};
-
-const initialObligations: Obligation[] = [
-  {
-    id: 1,
-    name: "Netflix",
-    description: "Suscripción",
-    date: "25 nov 2026",
-    amount: 12.99,
-    status: "Próxima",
-  },
-  {
-    id: 2,
-    name: "Renovación DNI",
-    description: "Documento",
-    date: "12 dic 2026",
-    status: "En plazo",
-  },
-  {
-    id: 3,
-    name: "Factura de luz",
-    description: "Suministro",
-    date: "18 dic 2026",
-    amount: 84.5,
-    status: "Próxima",
-  },
-];
-
-function readObligations(): Obligation[] {
-  try {
-    const saved = localStorage.getItem("krono-obligations");
-    return saved ? JSON.parse(saved) : initialObligations;
-  } catch {
-    return initialObligations;
-  }
-}
-
-function saveObligations(obligations: Obligation[]) {
-  localStorage.setItem("krono-obligations", JSON.stringify(obligations));
-}
+import {
+  addObligation,
+  loadObligations,
+  updateObligation as persistObligation,
+} from "./obligations/storage";
+import { formatDisplayDate, type Obligation } from "./obligations/model";
+import {
+  FIELD_ORDER,
+  defaultCategoryForType,
+  todayISO,
+  validateAddForm,
+  type AddFormErrors,
+  type AddFormField,
+} from "./obligations/formValidation";
 
 function formatAmount(amount: number) {
   return amount.toLocaleString("es-ES", {
@@ -162,7 +132,7 @@ function ScreenHeader({
 
 function HomePage() {
   const navigate = useNavigate();
-  const obligations = readObligations();
+  const obligations = loadObligations();
 
     const activeObligations = obligations.filter(
     (item) =>
@@ -212,7 +182,7 @@ function HomePage() {
                     {item.amount !== undefined
                       ? `${formatAmount(item.amount)} · `
                       : `${item.description} · `}
-                    Vence el {item.date}
+                    Vence el {formatDisplayDate(item.dueDate)}
                   </small>
                 </span>
                 <span
@@ -260,7 +230,7 @@ function ObligationsPage() {
     "Todas" | "Pendientes" | "Completadas" | "Canceladas"
   >("Todas");
 
-  const obligations = readObligations();
+  const obligations = loadObligations();
 
   const filteredObligations = obligations.filter((item) => {
     if (filter === "Completadas") {
@@ -341,8 +311,8 @@ function ObligationsPage() {
 
                 <small>
                   {item.amount !== undefined
-                    ? `${item.description} · ${formatAmount(item.amount)} · ${getShortDate(item.date)}`
-                    : `${item.description} · ${getShortDate(item.date)}`}
+                    ? `${item.description} · ${formatAmount(item.amount)} · ${getShortDate(formatDisplayDate(item.dueDate))}`
+                    : `${item.description} · ${getShortDate(formatDisplayDate(item.dueDate))}`}
                 </small>
               </span>
 
@@ -372,8 +342,8 @@ function ObligationDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const [obligations, setObligations] = useState<Obligation[]>(
-    readObligations()
+  const [obligations, setObligations] = useState<Obligation[]>(() =>
+    loadObligations()
   );
 
   const [showPostponeOptions, setShowPostponeOptions] = useState(false);
@@ -384,42 +354,9 @@ function ObligationDetailPage() {
   );
 
   function updateObligation(updatedObligation: Obligation) {
-    const updated = obligations.map((item) =>
-      item.id === updatedObligation.id ? updatedObligation : item
-    );
+    const updated = persistObligation(updatedObligation);
 
-    setObligations(updated);
-    saveObligations(updated);
-  }
-
-  function formatDetailDate(date: string) {
-    const months: Record<string, string> = {
-      ene: "01",
-      feb: "02",
-      mar: "03",
-      abr: "04",
-      may: "05",
-      jun: "06",
-      jul: "07",
-      ago: "08",
-      sep: "09",
-      oct: "10",
-      nov: "11",
-      dic: "12",
-    };
-
-    const parts = date.replace(".", "").split(" ");
-
-    if (parts.length === 3) {
-      const day = parts[0].padStart(2, "0");
-      const month = months[parts[1].toLowerCase()];
-
-      if (month) {
-        return `${day}/${month}/${parts[2]}`;
-      }
-    }
-
-    return date;
+    if (updated) setObligations(updated);
   }
 
   function markAsCompleted() {
@@ -541,7 +478,7 @@ function ObligationDetailPage() {
           <span>
             {subscription ? "Próximo cobro" : "Próximo vencimiento"}
           </span>
-          <strong>{formatDetailDate(obligation.date)}</strong>
+          <strong>{formatISODate(obligation.dueDate)}</strong>
         </div>
 
         <div className="detail-data-row">
@@ -719,6 +656,22 @@ function AddPage() {
   );
 }
 
+function FieldError({
+  field,
+  message,
+}: {
+  field: AddFormField;
+  message?: string;
+}) {
+  if (!message) return null;
+
+  return (
+    <p className="field-error" id={`obligation-${field}-error`} role="alert">
+      {message}
+    </p>
+  );
+}
+
 function AddFormPage() {
   const navigate = useNavigate();
 
@@ -728,35 +681,61 @@ function AddFormPage() {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
-  const [category, setCategory] = useState(selectedType);
-  const [error, setError] = useState(false);
+  const [category, setCategory] = useState(
+    defaultCategoryForType(selectedType)
+  );
+  const [errors, setErrors] = useState<AddFormErrors>({});
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
+
+  // Sin tipo elegido no tiene sentido el formulario: se vuelve al paso anterior.
+  if (!selectedType) {
+    return <Navigate to="/anadir" replace />;
+  }
+
+  // Al corregir un campo, su error desaparece.
+  function clearError(field: AddFormField) {
+    setErrors((current) => {
+      if (!current[field]) return current;
+
+      const rest = { ...current };
+      delete rest[field];
+      return rest;
+    });
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (
-      !name.trim() ||
-      !date ||
-      date < today ||
-      (amount !== "" && Number(amount) < 0)
-    ) {
-      setError(true);
+    const found = validateAddForm({ name, amount, date }, today);
+    setErrors(found);
+
+    const firstInvalid = FIELD_ORDER.find((field) => found[field]);
+    if (firstInvalid) {
+      document.getElementById(`obligation-${firstInvalid}`)?.focus();
       return;
     }
 
+    const normalizedAmount = amount.trim().replace(",", ".");
+
     const draft = {
       name: name.trim(),
-      amount: amount ? Number(amount) : undefined,
+      amount: normalizedAmount ? Number(normalizedAmount) : undefined,
       date,
       category,
       description: selectedType,
     };
 
     sessionStorage.setItem("krono-draft", JSON.stringify(draft));
-    setError(false);
     navigate("/anadir/aviso");
+  }
+
+  function fieldProps(field: AddFormField) {
+    return {
+      "aria-invalid": errors[field] ? true : undefined,
+      "aria-describedby": errors[field] ? `obligation-${field}-error` : undefined,
+      className: errors[field] ? "input-invalid" : undefined,
+    };
   }
 
   return (
@@ -767,19 +746,24 @@ function AddFormPage() {
         back
       />
 
-      <form className="figma-form" onSubmit={handleSubmit}>
+      <form className="figma-form" onSubmit={handleSubmit} noValidate>
         <label htmlFor="obligation-name">
           Nombre de la obligación
         </label>
         <input
           id="obligation-name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            clearError("name");
+          }}
           placeholder="Introduce un nombre"
+          {...fieldProps("name")}
         />
+        <FieldError field="name" message={errors.name} />
 
         <label htmlFor="obligation-amount">
-          Importe aproximado (€)
+          Importe aproximado (€) · opcional
         </label>
         <input
           id="obligation-amount"
@@ -787,9 +771,14 @@ function AddFormPage() {
           min="0"
           step="0.01"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            clearError("amount");
+          }}
           placeholder="Ej. 12,99"
+          {...fieldProps("amount")}
         />
+        <FieldError field="amount" message={errors.amount} />
 
         <label htmlFor="obligation-date">
           Fecha de vencimiento
@@ -799,8 +788,13 @@ function AddFormPage() {
           type="date"
           min={today}
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => {
+            setDate(e.target.value);
+            clearError("date");
+          }}
+          {...fieldProps("date")}
         />
+        <FieldError field="date" message={errors.date} />
 
         <label htmlFor="obligation-category">Categoría</label>
         <select
@@ -816,13 +810,6 @@ function AddFormPage() {
           <option value="Trámite">Trámite</option>
         </select>
 
-        {error && (
-          <p className="form-error">
-            Revisa los datos. El nombre y la fecha son obligatorios,
-            y la fecha no puede ser anterior a hoy.
-          </p>
-        )}
-
         <button className="primary-button" type="submit">
           Siguiente
         </button>
@@ -831,7 +818,12 @@ function AddFormPage() {
       <button
         className="example-validation"
         type="button"
-        onClick={() => setError(true)}
+        onClick={() =>
+          setErrors({
+            name: "Introduce un nombre para la obligación.",
+            date: "La fecha no puede ser anterior a hoy.",
+          })
+        }
       >
         Ver ejemplo de validación
       </button>
@@ -854,31 +846,23 @@ function ReminderPage() {
 
     const draft = JSON.parse(draftText);
 
-    const obligation: Obligation = {
-      id: Date.now(),
+    const result = addObligation({
       name: draft.name,
       description: draft.description,
-      date: new Date(`${draft.date}T12:00:00`).toLocaleDateString(
-        "es-ES",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
-      ),
+      dueDate: draft.date,
       amount: draft.amount,
       category: draft.category,
       reminderDays,
-      status: "En plazo",
-    };
+    });
 
-    const obligations = readObligations();
-
-    saveObligations([...obligations, obligation]);
+    if (!result.ok) {
+      navigate("/anadir/formulario");
+      return;
+    }
 
     sessionStorage.setItem(
       "krono-last-created",
-      JSON.stringify(obligation)
+      JSON.stringify(result.obligation)
     );
 
     sessionStorage.removeItem("krono-draft");
@@ -985,7 +969,7 @@ function CreationConfirmation() {
           {obligation.name} · {obligation.description}
         </strong>
 
-        <span>Fecha límite: {obligation.date}</span>
+        <span>Fecha límite: {formatDisplayDate(obligation.dueDate)}</span>
 
         {obligation.amount !== undefined && (
           <span>
@@ -1014,14 +998,14 @@ function CreationConfirmation() {
 function AlertsPage() {
   const navigate = useNavigate();
 
-  const obligations = readObligations()
+  const obligations = loadObligations()
     .filter(
       (item) =>
         item.status !== "Completada" &&
         item.status !== "Cancelada" &&
         item.reminderDays !== undefined
     )
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
   return (
     <main className="screen">
@@ -1044,7 +1028,7 @@ function AlertsPage() {
                 <small>
                   {item.reminderSnoozedUntil
                     ? `Aviso pospuesto hasta ${formatISODate(item.reminderSnoozedUntil)}`
-                    : `Aviso ${item.reminderDays} días antes · Vence el ${item.date}`}
+                    : `Aviso ${item.reminderDays} días antes · Vence el ${formatDisplayDate(item.dueDate)}`}
                 </small>
               </span>
 
@@ -1079,7 +1063,7 @@ function ProfilePage() {
 }
 
 function SummaryPage() {
-  const obligations = readObligations();
+  const obligations = loadObligations();
 
   const activeObligations = obligations.filter(
     (item) =>
