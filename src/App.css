@@ -475,6 +475,19 @@
   line-height: 16px;
 }
 
+/* Error junto al campo: sustituye al hueco del margen inferior del input. */
+.figma-form input.input-invalid {
+  margin-bottom: 6px;
+  border-color: #b95c50;
+}
+
+.field-error {
+  margin: 0 0 16px;
+  color: #b95c50;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .example-validation {
   margin-top: 14px;
   padding: 0;
