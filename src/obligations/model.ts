@@ -158,3 +158,34 @@ export function parseDisplayDate(text: string): string | undefined {
   const iso = `${parts[2]}-${String(month + 1).padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
   return isValidISODate(iso) ? iso : undefined;
 }
+
+/** Días de margen a partir de los cuales una obligación pendiente pasa a "Próxima". */
+export const UPCOMING_DAYS = 7;
+
+/** Días enteros entre dos fechas ISO (b - a), sin depender de zona horaria. */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
+}
+
+/**
+ * Estado que se enseña en pantalla. Completada y Cancelada son decisiones del
+ * usuario y se respetan; para el resto manda la fecha límite:
+ * pasada -> Vencida, dentro de UPCOMING_DAYS -> Próxima, más lejos -> En plazo.
+ */
+export function getDisplayStatus(
+  obligation: Pick<Obligation, "status" | "dueDate">,
+  today: string
+): ObligationStatus {
+  if (obligation.status === "Completada" || obligation.status === "Cancelada") {
+    return obligation.status;
+  }
+
+  const days = daysBetween(today, obligation.dueDate);
+
+  if (days < 0) return "Vencida";
+  if (days <= UPCOMING_DAYS) return "Próxima";
+  return "En plazo";
+}

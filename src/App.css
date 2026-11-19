@@ -972,3 +972,14 @@
     padding: 12px;
   }
 }
+
+.reminder-date {
+  display: block;
+  margin-top: 4px;
+  color: #292725;
+  font-size: 13px;
+}
+
+.reminder-warning {
+  margin: 12px 0 0;
+}

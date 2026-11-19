@@ -5,6 +5,7 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -24,7 +25,16 @@ import {
   loadObligations,
   updateObligation as persistObligation,
 } from "./obligations/storage";
-import { formatDisplayDate, type Obligation } from "./obligations/model";
+import {
+  formatDisplayDate,
+  getDisplayStatus,
+  type Obligation,
+} from "./obligations/model";
+import {
+  describeReminderDistance,
+  getNextReminderDate,
+  planReminder,
+} from "./obligations/reminders";
 import {
   FIELD_ORDER,
   defaultCategoryForType,
@@ -70,6 +80,15 @@ function isSubscription(obligation: Obligation) {
     description.includes("suscrip") ||
     category.includes("suscrip")
   );
+}
+
+function getStatusClass(status: Obligation["status"]) {
+  if (status === "Completada") return "status-completed";
+  if (status === "Cancelada") return "status-cancelled";
+  if (status === "Vencida") return "status-overdue";
+  if (status === "En plazo") return "status-ok";
+
+  return "status-upcoming";
 }
 
 function Navigation() {
@@ -133,19 +152,21 @@ function ScreenHeader({
 function HomePage() {
   const navigate = useNavigate();
   const obligations = loadObligations();
+  const today = todayISO();
 
-    const activeObligations = obligations.filter(
+  const activeObligations = obligations.filter(
     (item) =>
       item.status !== "Completada" &&
       item.status !== "Cancelada"
   );
 
-  const upcoming = activeObligations
-    .filter((item) => item.status !== "Vencida")
+  // Las más urgentes primero (las vencidas salen arriba).
+  const upcoming = [...activeObligations]
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 3);
 
   const nextCount = upcoming.filter(
-    (item) => item.status === "Próxima"
+    (item) => getDisplayStatus(item, today) === "Próxima"
   ).length;
 
   const total = activeObligations.reduce(
@@ -174,7 +195,7 @@ function HomePage() {
               <button
                 className="obligation-preview"
                 key={item.id}
-                onClick={() => navigate("/obligaciones")}
+                onClick={() => navigate(`/obligaciones/${item.id}`)}
               >
                 <span className="obligation-info">
                   <strong>{item.name}</strong>
@@ -186,13 +207,11 @@ function HomePage() {
                   </small>
                 </span>
                 <span
-                  className={`status-chip ${
-                    item.status === "En plazo"
-                      ? "status-ok"
-                      : "status-upcoming"
-                  }`}
+                  className={`status-chip ${getStatusClass(
+                    getDisplayStatus(item, today)
+                  )}`}
                 >
-                  {item.status}
+                  {getDisplayStatus(item, today)}
                 </span>
               </button>
             ))
@@ -231,6 +250,7 @@ function ObligationsPage() {
   >("Todas");
 
   const obligations = loadObligations();
+  const today = todayISO();
 
   const filteredObligations = obligations.filter((item) => {
     if (filter === "Completadas") {
@@ -259,15 +279,6 @@ function ObligationsPage() {
     }
 
     return date;
-  }
-
-  function getStatusClass(status: Obligation["status"]) {
-    if (status === "Completada") return "status-completed";
-    if (status === "Cancelada") return "status-cancelled";
-    if (status === "Vencida") return "status-overdue";
-    if (status === "En plazo") return "status-ok";
-
-    return "status-upcoming";
   }
 
   return (
@@ -316,8 +327,12 @@ function ObligationsPage() {
                 </small>
               </span>
 
-              <span className={`status-chip ${getStatusClass(item.status)}`}>
-                {item.status}
+              <span
+                className={`status-chip ${getStatusClass(
+                  getDisplayStatus(item, today)
+                )}`}
+              >
+                {getDisplayStatus(item, today)}
               </span>
             </button>
           ))
@@ -340,6 +355,8 @@ function ObligationsPage() {
 
 function ObligationDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const today = todayISO();
   const { id } = useParams();
 
   const [obligations, setObligations] = useState<Obligation[]>(() =>
@@ -357,6 +374,17 @@ function ObligationDetailPage() {
     const updated = persistObligation(updatedObligation);
 
     if (updated) setObligations(updated);
+  }
+
+  // Vuelve a la pantalla de la que venía (inicio, lista o alertas).
+  // Si se abrió el detalle directamente, no hay historial: va al inicio.
+  function goBack() {
+    if (location.key === "default") {
+      navigate("/");
+      return;
+    }
+
+    navigate(-1);
   }
 
   function markAsCompleted() {
@@ -406,15 +434,6 @@ function ObligationDetailPage() {
     navigate("/obligaciones");
   }
 
-  function getStatusClass(status: Obligation["status"]) {
-    if (status === "Completada") return "status-completed";
-    if (status === "Cancelada") return "status-cancelled";
-    if (status === "Vencida") return "status-overdue";
-    if (status === "En plazo") return "status-ok";
-
-    return "status-upcoming";
-  }
-
   if (!obligation) {
     return (
       <main className="screen">
@@ -447,8 +466,8 @@ function ObligationDetailPage() {
       <div className="detail-heading">
         <button
           className="detail-back"
-          onClick={() => navigate("/obligaciones")}
-          aria-label="Volver a obligaciones"
+          onClick={goBack}
+          aria-label="Volver"
         >
           <ArrowLeft size={21} />
         </button>
@@ -468,8 +487,12 @@ function ObligationDetailPage() {
           <span>{obligation.description}</span>
         </div>
 
-        <span className={`status-chip ${getStatusClass(obligation.status)}`}>
-          {obligation.status}
+        <span
+          className={`status-chip ${getStatusClass(
+            getDisplayStatus(obligation, today)
+          )}`}
+        >
+          {getDisplayStatus(obligation, today)}
         </span>
       </section>
 
@@ -487,6 +510,15 @@ function ObligationDetailPage() {
             {obligation.amount !== undefined
               ? formatAmount(obligation.amount)
               : "No especificado"}
+          </strong>
+        </div>
+
+        <div className="detail-data-row">
+          <span>Fecha de aviso</span>
+          <strong>
+            {obligation.noticeDate
+              ? formatISODate(obligation.noticeDate)
+              : "No configurada"}
           </strong>
         </div>
 
@@ -831,10 +863,28 @@ function AddFormPage() {
   );
 }
 
+function readDraftDueDate(): string | undefined {
+  try {
+    const draft = JSON.parse(sessionStorage.getItem("krono-draft") ?? "null");
+    return typeof draft?.date === "string" ? draft.date : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function ReminderPage() {
   const navigate = useNavigate();
 
   const [reminderDays, setReminderDays] = useState(3);
+  const dueDate = readDraftDueDate();
+  const today = todayISO();
+
+  // Sin borrador no hay nada que configurar: se vuelve al paso de alta.
+  if (!dueDate) {
+    return <Navigate to="/anadir" replace />;
+  }
+
+  const plan = planReminder(dueDate, reminderDays, today);
 
   function saveObligation() {
     const draftText = sessionStorage.getItem("krono-draft");
@@ -909,9 +959,20 @@ function ReminderPage() {
       </section>
 
       <div className="reminder-summary">
-        El aviso se programará para {reminderDays} día(s) antes de la fecha
-        de vencimiento.
+        Vencimiento: {formatISODate(dueDate)}
+        <br />
+        <strong className="reminder-date">
+          Fecha del aviso: {formatISODate(plan.noticeDate)}
+        </strong>
       </div>
+
+      {plan.isInPast && (
+        <p className="field-error reminder-warning" role="alert">
+          Esa fecha ya ha pasado. Te avisaremos hoy,{" "}
+          {formatISODate(plan.effectiveDate)}. Elige menos antelación si
+          prefieres otra fecha.
+        </p>
+      )}
 
       <button
         className="primary-button reminder-save"
@@ -997,15 +1058,15 @@ function CreationConfirmation() {
 
 function AlertsPage() {
   const navigate = useNavigate();
+  const today = todayISO();
 
-  const obligations = loadObligations()
+  const reminders = loadObligations()
+    .map((item) => ({ item, next: getNextReminderDate(item, today) }))
     .filter(
-      (item) =>
-        item.status !== "Completada" &&
-        item.status !== "Cancelada" &&
-        item.reminderDays !== undefined
+      (entry): entry is { item: Obligation; next: string } =>
+        entry.next !== undefined
     )
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    .sort((a, b) => a.next.localeCompare(b.next));
 
   return (
     <main className="screen">
@@ -1015,8 +1076,8 @@ function AlertsPage() {
       />
 
       <section className="obligations-list">
-        {obligations.length > 0 ? (
-          obligations.map((item) => (
+        {reminders.length > 0 ? (
+          reminders.map(({ item, next }) => (
             <button
               type="button"
               className="obligation-list-card"
@@ -1026,9 +1087,11 @@ function AlertsPage() {
               <span className="obligation-list-info">
                 <strong>{item.name}</strong>
                 <small>
-                  {item.reminderSnoozedUntil
-                    ? `Aviso pospuesto hasta ${formatISODate(item.reminderSnoozedUntil)}`
-                    : `Aviso ${item.reminderDays} días antes · Vence el ${formatDisplayDate(item.dueDate)}`}
+                  {next <= today
+                    ? `Aviso activo · Vence el ${formatDisplayDate(item.dueDate)}`
+                    : item.reminderSnoozedUntil === next
+                    ? `Aviso pospuesto hasta ${formatISODate(next)}`
+                    : `Aviso el ${formatISODate(next)} (${describeReminderDistance(next, today)}) · Vence el ${formatDisplayDate(item.dueDate)}`}
                 </small>
               </span>
 
