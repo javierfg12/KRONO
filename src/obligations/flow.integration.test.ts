@@ -24,7 +24,7 @@ describe("E4PA-89: integración del ciclo de vida", () => {
     const storage = storageFixture();
     saveObligations([], storage); // espacio limpio, sin las tarjetas de ejemplo
     const form = { name: "Netflix", amount: "12,99", date: "2026-11-28" };
-    expect(validateAddForm(form, TODAY)).toEqual([]);
+    expect(validateAddForm(form, TODAY)).toEqual({});
     const result = addObligation({
       name: form.name, amount: Number(form.amount.replace(",", ".")),
       description: "Suscripción de pago", category: "Suscripción",
