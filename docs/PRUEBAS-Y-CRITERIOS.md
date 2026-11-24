@@ -71,11 +71,11 @@ Abrir la dirección local de Vite. Para garantizar una prueba aislada, borrar so
 
 | Fecha / ejecutor | Commit | Comando / caso | Resultado esperado | Resultado observado | Evidencia | Incidencia |
 |---|---|---|---|---|---|---|
-| Pendiente | Pendiente | `npm run lint` | Sin errores | Sin ejecutar/documentar | URL de CI | — |
-| Pendiente | Pendiente | `npm test` | Todas verdes | Sin ejecutar/documentar | URL de CI | — |
-| Pendiente | Pendiente | `npm run build` | Compilación exitosa | Sin ejecutar/documentar | URL de CI | — |
+| 24/11/2026 · GitHub Actions | b913932 | `npm run lint` | Sin errores | **Aprobado** | [CI verificado](https://github.com/javierfg12/KRONO/actions/runs/45434842797) | — |
+| 24/11/2026 · GitHub Actions | b913932 | `npm test` | Todas verdes | **51/51 aprobadas** | [CI verificado](https://github.com/javierfg12/KRONO/actions/runs/45434842797) | Primer intento falló por aserción errónea; corregida y reejecutada |
+| 24/11/2026 · GitHub Actions | b913932 | `npm run build` | Compilación exitosa | **Aprobado** | [CI verificado](https://github.com/javierfg12/KRONO/actions/runs/45434842797) | — |
 | Pendiente | Pendiente | Recorrido manual 1 | Alta correcta | Sin ejecutar | Capturas | — |
 | Pendiente | Pendiente | Recorrido manual 2 | Estados persistentes | Sin ejecutar | Capturas | — |
 | Pendiente | Pendiente | Recorrido manual 3 | Avisos coherentes | Sin ejecutar | Capturas | — |
 
-**No marcar E4PA-89 como «Listo» hasta completar la tabla con resultados observados y corregir los defectos bloqueantes.**
+**Situación:** CI automatizado aprobado (51 pruebas, lint y build). Los tres recorridos manuales y la comprobación visual de coherencia con Figma siguen pendientes de documentar. E4PA-89 no se puede dar por terminada sin esas evidencias. El primer intento de CI falló porque la prueba esperaba `[]` en vez del contrato correcto del validador (`{}`); la aserción se corrigió en el commit `b913932` y el pipeline posterior pasó. No se ha alterado la lógica de negocio para ocultar errores.
