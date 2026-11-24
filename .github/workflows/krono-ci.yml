@@ -1,0 +1,33 @@
+name: KRONO · Calidad del flujo principal
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "mejora/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    name: Lint, pruebas y compilación
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Instalar dependencias reproducibles
+        run: npm ci
+      - name: Analizar código
+        run: npm run lint
+      - name: Ejecutar pruebas automatizadas
+        run: npm test
+      - name: Comprobar TypeScript y generar compilación
+        run: npm run build

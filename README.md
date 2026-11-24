@@ -1,75 +1,71 @@
-# React + TypeScript + Vite
+# KRONO
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación web académica para organizar **suscripciones, facturas y fechas de vencimiento de documentos**. Ayuda a anticiparse a renovaciones y trámites; **no procesa pagos ni mueve dinero**.
 
-Currently, two official plugins are available:
+## Estado actual
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Implementación en React + TypeScript + Vite del flujo principal diseñado en Figma. El almacenamiento es **local al navegador** (`localStorage`), por lo que la información no se sincroniza entre dispositivos.
 
-## React Compiler
+### Funcionalidades
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Inicio con próximos vencimientos y resumen económico de importes introducidos.
+- Navegación: **Inicio, Obligaciones, Añadir, Alertas y Perfil**.
+- Alta de obligaciones por tipo: suscripción, factura/suministro o documento oficial.
+- Validación de nombre, fecha y cantidad opcional; errores junto al campo.
+- Antelación configurable: 1, 3 o 7 días; fecha de aviso calculada y advertencia de fechas de aviso pasadas.
+- Listado con filtros: todas, pendientes, completadas y canceladas.
+- Consulta de detalle, resolución y aplazamiento de avisos: **1 día, 3 días, 1 semana o 1 mes**.
+- Confirmación visible de acciones, persistencia de estados y cálculo de avisos.
 
-## Expanding the ESLint configuration
+**Limitaciones conocidas:** no hay login/autenticación real, notificaciones push del sistema operativo ni backend. La pantalla Alertas representa avisos calculados en la aplicación; no envía mensajes por sí sola. La validación formal con usuarios (Jira E4PA-49) requiere sesiones reales y sus registros.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Ejecutar el proyecto
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Requisitos: Node.js 24 y npm.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Abrir la dirección local mostrada por Vite.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Verificaciones técnicas
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run lint
+npm test
+npm run build
 ```
+
+La carpeta `src/obligations` contiene modelo, persistencia, validación de formulario, cálculo de avisos y acciones. Las pruebas abarcan fechas límite (cambios de mes, año, bisiestos), altas válidas/incorrectas, persistencia simulada con almacenamiento falso, estados, aplazamientos y un ciclo de vida integrado.
+
+El workflow [KRONO · Calidad del flujo principal](.github/workflows/krono-ci.yml) ejecuta estas comprobaciones en los cambios al repositorio y en las pull requests contra `main`. El hecho de disponer de pruebas **no equivale a su ejecución aprobada**: consultar los resultados del workflow.
+
+## Criterios y evidencias de Jira
+
+- [E4PA-84](https://davidpesquera.atlassian.net/browse/E4PA-84): modelo y persistencia.
+- [E4PA-85](https://davidpesquera.atlassian.net/browse/E4PA-85): formulario de alta.
+- [E4PA-86](https://davidpesquera.atlassian.net/browse/E4PA-86): recordatorios lógicos.
+- [E4PA-87](https://davidpesquera.atlassian.net/browse/E4PA-87): listado y detalle.
+- [E4PA-88](https://davidpesquera.atlassian.net/browse/E4PA-88): resolver y posponer.
+- [E4PA-89](https://davidpesquera.atlassian.net/browse/E4PA-89): pruebas funcionales e integración.
+- [E4PA-49](https://davidpesquera.atlassian.net/browse/E4PA-49): validación con usuarios (separada de las pruebas técnicas).
+
+Consultar [matriz de pruebas y aceptación](docs/PRUEBAS-Y-CRITERIOS.md) y [protocolo de validación con usuarios](docs/VALIDACION-USUARIOS.md).
+
+## Diseño de referencia
+
+[KRONO · Figma Design](https://www.figma.com/design/Ma4ulIMoSkGhp06w8F0JHz/Sprint-1): Moodboard, Foundations, Componentes, App, Sitemap, Flowchart y Wireframes.
+
+## Organización
+
+- `src/App.tsx`: pantallas, navegación y orquestación de formularios y acciones.
+- `src/obligations/model.ts`: entidad Obligación, estados y fechas.
+- `src/obligations/storage.ts`: guardado/lectura en almacenamiento local.
+- `src/obligations/formValidation.ts`: validaciones del alta.
+- `src/obligations/reminders.ts`: planificación lógica de avisos.
+- `src/obligations/actions.ts`: resolución y aplazamiento persistentes.
+- `src/obligations/*.test.ts`: pruebas de lógica e integración.
+
+Proyecto universitario de Ingeniería Informática. No deben publicarse datos personales reales de participantes en este repositorio.
