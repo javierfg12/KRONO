@@ -21,6 +21,12 @@ import {
 import "./App.css";
 import React, { useState } from "react";
 import {
+  POSTPONE_PERIODS,
+  postponeObligation,
+  resolveObligation,
+  type PostponePeriod,
+} from "./obligations/actions";
+import {
   addObligation,
   loadObligations,
   updateObligation as persistObligation,
@@ -57,12 +63,6 @@ function getLocalDateISO(date = new Date()) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
-}
-
-function addDaysToToday(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return getLocalDateISO(date);
 }
 
 function formatISODate(date: string) {
@@ -244,6 +244,8 @@ function HomePage() {
 
 function ObligationsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const actionNotice = (location.state as { actionNotice?: string } | null)?.actionNotice;
 
   const [filter, setFilter] = useState<
     "Todas" | "Pendientes" | "Completadas" | "Canceladas"
@@ -291,6 +293,10 @@ function ObligationsPage() {
       <p className="obligations-subtitle">
         Consulta y organiza todo lo que tienes pendiente.
       </p>
+
+      {actionNotice && (
+        <p className="detail-action-message" role="status">{actionNotice}</p>
+      )}
 
       <div className="obligation-filters">
         {(
@@ -389,29 +395,28 @@ function ObligationDetailPage() {
 
   function markAsCompleted() {
     if (!obligation) return;
-
-    updateObligation({
-      ...obligation,
-      status: "Completada",
-      reminderSnoozedUntil: undefined,
+    const result = resolveObligation(obligation.id);
+    if (!result.ok) {
+      setActionMessage("No se pudo actualizar la obligación. Inténtalo de nuevo.");
+      return;
+    }
+    setObligations(result.obligations);
+    navigate("/obligaciones", {
+      state: { actionNotice: "Obligación marcada como resuelta." },
     });
-
-    navigate("/obligaciones");
   }
 
-  function postponeReminder(days: number) {
+  function postponeReminder(period: PostponePeriod) {
     if (!obligation) return;
-
-    const postponedDate = addDaysToToday(days);
-
-    updateObligation({
-      ...obligation,
-      reminderSnoozedUntil: postponedDate,
-    });
-
+    const result = postponeObligation(obligation.id, period, today);
+    if (!result.ok) {
+      setActionMessage("No se pudo posponer el aviso. Inténtalo de nuevo.");
+      return;
+    }
+    setObligations(result.obligations);
     setShowPostponeOptions(false);
     setActionMessage(
-      `Aviso pospuesto hasta el ${formatISODate(postponedDate)}.`
+      `Aviso pospuesto hasta el ${formatISODate(result.obligation.reminderSnoozedUntil ?? "")}.`
     );
   }
 
@@ -575,19 +580,15 @@ function ObligationDetailPage() {
             <section className="detail-postpone-options">
               <p>¿Cuándo quieres recibir el aviso?</p>
 
-              <button
-                className="outline-button detail-action"
-                onClick={() => postponeReminder(1)}
-              >
-                Posponer 1 día
-              </button>
-
-              <button
-                className="outline-button detail-action"
-                onClick={() => postponeReminder(3)}
-              >
-                Posponer 3 días
-              </button>
+              {POSTPONE_PERIODS.map((period) => (
+                <button
+                  className="outline-button detail-action"
+                  key={period.value}
+                  onClick={() => postponeReminder(period.value)}
+                >
+                  {period.label}
+                </button>
+              ))}
             </section>
           )}
 
