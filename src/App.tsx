@@ -1175,6 +1175,8 @@ function AppRoutes() {
         <Route path="/alertas" element={<AlertsPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
         <Route path="/resumen" element={<SummaryPage />} />
+        {/* Una URL desconocida no debe dejar solo la navegación inferior visible. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       <Navigation />
